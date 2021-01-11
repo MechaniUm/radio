@@ -60,7 +60,8 @@ void StopStepper(int n) {
 PI_THREAD (stepperRunThread0) {
     while (true) {
         if (stop_threads) break;
-        RunStepper(0);
+        if (!pause_threads)
+            RunStepper(0);
         sched_yield();
     }
     return 0;
@@ -69,7 +70,8 @@ PI_THREAD (stepperRunThread0) {
 PI_THREAD (stepperRunThread1) {
     while (true) {
         if (stop_threads) break;
-        RunStepper(1);
+        if (!pause_threads)
+           RunStepper(1);
         sched_yield();
     }
     return 0;
@@ -89,6 +91,7 @@ void SteppersDisable() {
 
 
 void h0() {
+    if (pause_threads) return;
     piLock(0);
     ResetEncoder(0, 0);
     can_dec[0] = false;
@@ -100,6 +103,7 @@ void h0() {
 }
 
 void h1() {
+    if (pause_threads) return;
     piLock(0);
     can_inc[0] = false;
     last_hall_change_time[1] = millis();
@@ -111,6 +115,7 @@ void h1() {
 }
 
 void h2() {
+    if (pause_threads) return;
     piLock(1);
     can_dec[1] = false;
     last_hall_change_time[2] = millis();
@@ -122,6 +127,7 @@ void h2() {
 }
 
 void h3() {
+    if (pause_threads) return;
     piLock(1);
     can_inc[1] = false;
     last_hall_change_time[3] = millis();
@@ -158,6 +164,27 @@ void StepperInit(int n) {
         right_bound[1] = length[1];
         std::cout << "Stepper " << n << " length =  " << length[n] << std::endl;
     }
+}
+
+void StepperReset(int n) {
+    steppers[n].moveTo(99999);
+    while (digitalRead(halls[2 * n + 1]) != LOW)
+        steppers[n].run();
+    steppers[n].setCurrentPosition(0);
+    steppers[n].moveTo(0);
+    steppers[n].moveTo(-99999);
+    while (digitalRead(halls[2 * n]) != LOW)
+        steppers[n].run();
+    length[n] = -steppers[n].currentPosition();
+    steppers[n].setCurrentPosition(0);
+    steppers[n].moveTo(0);
+    right_bound[0] = length[0];
+    right_bound[1] = length[1];
+}
+
+void SteppersReset() {
+    StepperReset(0);
+    StepperReset(1);
 }
 
 void SteppersInit() {

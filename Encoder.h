@@ -20,6 +20,7 @@ bool CanDec(int n);
 bool CanInc(int n);
 
 void UpdateEncoder(int n) {
+    if (pause_threads) return; 
     uint8_t tmp_state = state[n] & 3;
     if (digitalRead(pin_a[n])) {
         tmp_state |= 4;
@@ -81,6 +82,11 @@ void EncoderInit(int n) {
     if (digitalRead(pin_b[n])) {
         state[n] |= 2;
     }
+}
+
+void EncodersReset() {
+    ResetEncoder(0, 0);
+    ResetEncoder(1, 0);
 }
 
 void EncodersInit() {

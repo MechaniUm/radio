@@ -11,7 +11,7 @@ int city_id = 0;
 
 int globe_degree[8] = { 322, 248, 220, 77, 0, 357, 346, 348 };
 int globe_pos[8] = { 10185, 6805, 5526, -1005, -4522, 11783, 11281, 11372 };
-int globe_delta = 70;
+int globe_delta = 0;
 int prev_stepper_pos = 0;
 int offset_count = 0;
 int offset_len = 200;
@@ -43,47 +43,14 @@ void CalcGlobePos() {
     cout << endl;
 }
 
-void globe_timer_handler (int signum)
-{
-    int cur_pos = steppers[0].targetPosition();
-    if (prev_stepper_pos != cur_pos && globe_state != ROTATING) {
-        StopStepper(2);
-        globe_state = ROTATING;
-        last_city_id = city_id;
-       
-    } else if (prev_stepper_pos == cur_pos && globe_state == ROTATING) {
-        
-        if (steppers[2].currentPosition() != globe_pos[city_id] && abs(steppers[2].currentPosition() - globe_pos[city_id]) < length[2] / 3) 
-            offset_count = 2; 
-        else
-            offset_count = 0;
-        globe_state = CORRECTING;
-        
-    }
-    prev_stepper_pos = cur_pos;
-}
-
-
 PI_THREAD (stepperRunThread2) {
-    // struct sigaction sa;
-    // struct itimerval timer;
-
-    // memset (&sa, 0, sizeof (sa));
-    // sa.sa_handler = &globe_timer_handler;
-    // sigaction (SIGVTALRM, &sa, NULL);
-
-    // timer.it_value.tv_sec = 0;
-    // timer.it_value.tv_usec = 200000;
-    // timer.it_interval.tv_sec = 0;
-    // timer.it_interval.tv_usec = 200000;
-    // setitimer (ITIMER_VIRTUAL, &timer, NULL);
-
     unsigned long time = millis();
 
     while (true) {
 
         if (stop_threads) break;
-
+        if (pause_threads) continue; 
+           
         if (labs(millis() - time) > 200) {
             piLock(0);
             int cur_pos = steppers[0].targetPosition();
@@ -127,8 +94,7 @@ PI_THREAD (stepperRunThread2) {
                         if (a1 > a2) l3 = -l3;
                     } else {
                         if (a1 < a2) l3 = -l3;
-                    } 
-                    // int next_pos = -globe_offset + (globe_degree[last_city_id] + l3) * degree_len;
+                    }
                     int next_pos = (globe_degree[last_city_id] + l3) * degree_len;
                     if (l3 == 0)
                         offset_count = 0;
@@ -138,14 +104,12 @@ PI_THREAD (stepperRunThread2) {
                         next_pos -= offset_count * offset_len;
                     }
                     offset_count--;
-                    // if (steppers[2].currentPosition() != next_pos)
-                        steppers[2].moveTo(next_pos);
+                    steppers[2].moveTo(next_pos);
                     
                     
                 } else {
                     StopStepper(2);
                     globe_state = STAYING;
-                   
                 }
             }
             break;
@@ -156,6 +120,41 @@ PI_THREAD (stepperRunThread2) {
         }
     }
     return 0;
+}
+
+void GlobeReset() {
+    steppers[2].setCurrentPosition(0);
+    steppers[2].moveTo(99999);
+    bool was_high = false;
+    int prev_globe_pos = 0;
+    int tmp = 0;
+    while (1) {
+        if (digitalRead(halls[4]) == LOW) {
+            if (was_high) {
+                // cout << steppers[2].currentPosition() - prev_globe_pos << endl;
+                was_high = false;
+                if (steppers[2].currentPosition() - prev_globe_pos > 900) {
+                    if (tmp)
+                        break;
+                    tmp = 1;
+                    steppers[2].setCurrentPosition(0);
+                    steppers[2].moveTo(99999);
+                }
+                prev_globe_pos = steppers[2].currentPosition();
+            }
+        } else {
+            was_high = true;
+        }
+        steppers[2].run();
+    }
+    length[2] = steppers[2].currentPosition();
+    steppers[2].setCurrentPosition(0);
+    steppers[2].moveTo(globe_pos[0]);
+    while (steppers[2].isRunning()) {
+        steppers[2].run();
+    }
+    StopStepper(2);
+    CalcGlobePos();
 }
 
 void GlobeInit() {

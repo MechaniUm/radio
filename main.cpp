@@ -6,7 +6,7 @@
 #include <string>
 
 bool stop_threads = false;
-
+bool pause_threads = false;
 #include "Stepper.h"
 #include "Encoder.h"
 #include "Hall.h"
@@ -14,6 +14,7 @@ bool stop_threads = false;
 
 using namespace std;
 
+unsigned long afk_timeout = 5 * 60 * 1000; // 5 min
 
 int sound_pos[16];
 
@@ -32,6 +33,12 @@ void HardwareInit() {
     SteppersInit();
     GlobeInit();
     EncodersInit();
+}
+
+void HardwareReset() {
+    SteppersReset();
+    GlobeReset();
+    EncodersReset();
 }
 
 float GetVolume(int n, int pos, int sound_id) {
@@ -72,6 +79,7 @@ int GetSoundId(int n, int pos) {
     cout << "sound id -1 at " << pos << endl;
     return -1;
 }
+
 
 int main() {
     signal(SIGINT, SignalCallback);
@@ -129,7 +137,28 @@ int main() {
     int last_city_id = 0, last_leader_id = 0;
     CalculateSoundPos();
     cout << "Init successfull\n";
+    bool afk = true;
+    unsigned long action_time = millis();
     while (true) {
+
+        if (!afk && labs(millis() - action_time) > afk_timeout) {
+            afk = true;
+            pause_threads = true;
+
+            leaders_sounds[last_leader_id].stop();
+            cities_sounds[last_city_id].stop();
+            noise_sound.stop();
+            HardwareReset();
+            cities_sounds[0].setVolume(0.0);
+            leaders_sounds[0].setVolume(0.0);
+            cities_sounds[0].play();
+            leaders_sounds[0].play();
+            noise_sound.play();
+
+            action_time = millis();
+            pause_threads = false;
+        }
+
         MoveStepper(0);
         MoveStepper(1);
 
@@ -167,7 +196,10 @@ int main() {
             leaders_sounds[leader_id].setVolume(leader_volume);
         }
         if (last_noise_volume != noise_volume) {
+            last_noise_volume = noise_volume;
             noise_sound.setVolume(noise_volume);
+            action_time = millis();
+            afk = false;
         }
         sched_yield();
     }
