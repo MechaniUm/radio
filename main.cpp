@@ -76,7 +76,7 @@ int GetSoundId(int n, int pos) {
             return i;
         }
     }
-    cout << "sound id -1 at " << pos << endl;
+    cout << "sound id -1 at " << pos << ' ' << n << endl;
     return -1;
 }
 
