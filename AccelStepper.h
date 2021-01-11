@@ -272,7 +272,7 @@ private:
 
     typedef enum
     {
-	    DIRECTION_CCW = 0,  ///< Counter-Clockwise
+	DIRECTION_CCW = 0,  ///< Counter-Clockwise
         DIRECTION_CW  = 1   ///< Clockwise
     } Direction;
 

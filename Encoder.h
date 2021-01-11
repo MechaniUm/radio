@@ -12,8 +12,6 @@ int32_t left_bound[2] = {0, 0}, right_bound[2] = { length[0], length[1] };
 int32_t pos[2], value[2], step_length[2] = {5, 5};
 uint8_t state[2];
 unsigned long last_rotate_time[2];
-bool moved = false;
-chrono::steady_clock::time_point last_action_time;
 
 unsigned long upd_time = 0;
 
@@ -47,18 +45,14 @@ void UpdateEncoder(int n) {
         value[n] = right_bound[n];
         pos[n] = right_bound[n] * step_length[n];
     }
-    last_action_time = chrono::steady_clock::now();
-    moved = true;
 }
 
 void UpdateEncoder0() {
-    if (!resetting)
-        UpdateEncoder(0);
+    UpdateEncoder(0);
 }
 
 void UpdateEncoder1() {
-    if (!resetting)
-        UpdateEncoder(1);
+    UpdateEncoder(1);
 }
 
 int32_t ReadEncoder(int n) {
@@ -93,10 +87,10 @@ void EncodersInit() {
     wiringPiSetupGpio();
 
     EncoderInit(0);
+    EncoderInit(1);
     wiringPiISR(pin_a[0], INT_EDGE_BOTH, UpdateEncoder0);
     wiringPiISR(pin_b[0], INT_EDGE_BOTH, UpdateEncoder0);
 
-    EncoderInit(1);
     wiringPiISR(pin_a[1], INT_EDGE_BOTH, UpdateEncoder1);
     wiringPiISR(pin_b[1], INT_EDGE_BOTH, UpdateEncoder1);
 }

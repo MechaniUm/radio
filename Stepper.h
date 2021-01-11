@@ -8,8 +8,6 @@
 int rotate_counter[3];
 bool resetted[3] = {false, false, false};
 
-
-
 AccelStepper steppers[3] = {
     AccelStepper(23, 18, 16, true),
     AccelStepper(25, 24, 16, true),
@@ -61,8 +59,8 @@ void StopStepper(int n) {
 
 PI_THREAD (stepperRunThread0) {
     while (true) {
-        if (!resetting)
-            RunStepper(0);
+        if (stop_threads) break;
+        RunStepper(0);
         sched_yield();
     }
     return 0;
@@ -70,8 +68,8 @@ PI_THREAD (stepperRunThread0) {
 
 PI_THREAD (stepperRunThread1) {
     while (true) {
-        if (!resetting)
-            RunStepper(1);
+        if (stop_threads) break;
+        RunStepper(1);
         sched_yield();
     }
     return 0;
@@ -97,6 +95,7 @@ void h0() {
     last_hall_change_time[0] = millis();
     steppers[0].setCurrentPosition(0);
     steppers[0].moveTo(0);
+    cout << "h0\n";
     piUnlock(0);
 }
 
@@ -107,6 +106,7 @@ void h1() {
     ResetEncoder(0, length[0]);
     steppers[0].setCurrentPosition(length[0]);
     steppers[0].moveTo(length[0]);
+    cout << "h1\n";
     piUnlock(0);
 }
 
@@ -117,6 +117,7 @@ void h2() {
     ResetEncoder(1, 0);
     steppers[1].setCurrentPosition(0);
     steppers[1].moveTo(0);
+    cout << "h2\n";
     piUnlock(1);
 }
 
@@ -127,51 +128,14 @@ void h3() {
     ResetEncoder(1, length[1]);
     steppers[1].setCurrentPosition(length[1]);
     steppers[1].moveTo(length[1]);
+    cout << "h3\n";
     piUnlock(1);
 }
 
-void h4() {
-    piLock(2);
-    steppers[2].setCurrentPosition(0);
-    piUnlock(2);
-}
-
-const int half_rotate_steps = 400;
-
-int tmp5;
-int tmp7 = 10;
-int tmp8 = 10;
 void StepperSetPosition(int n, int new_pos) {
     piLock(n);
     steppers[n].setCurrentPositionOnly(new_pos);
     piUnlock(n);
-}
-
-unsigned long update_time[2];
-void h5() {
-    if (millis() - update_time[0] < 200) return;
-    update_time[0] = millis();
-    int pos = StepperCurrentPosition(0);
-    int target = steppers[0].targetPosition();
-    if (target < pos) {
-        rotate_counter[0]--;
-    } else if (target > pos) {
-        rotate_counter[0]++;
-    }
-    std::cout << rotate_counter[0] << '\n';
-    resetted[0] = false;
-}
-
-int tmp6;
-void h6() {
-    int pos = StepperCurrentPosition(1);
-    if (tmp6 < pos) {
-        rotate_counter[1]++;
-    } else if (tmp6 > pos) {
-        rotate_counter[1]--;
-    }
-    resetted[1] = false;
-    tmp6 = pos;
 }
 
 void StepperInit(int n) {
@@ -190,8 +154,10 @@ void StepperInit(int n) {
         length[n] = -steppers[n].currentPosition();
         steppers[n].setCurrentPosition(0);
         steppers[n].moveTo(0);
+        right_bound[0] = length[0];
+        right_bound[1] = length[1];
+        std::cout << "Stepper " << n << " length =  " << length[n] << std::endl;
     }
-    std::cout << "Stepper " << n << " length =  " << length[n] << std::endl;
 }
 
 void SteppersInit() {
@@ -207,68 +173,10 @@ void SteppersInit() {
     piThreadCreate(stepperRunThread0);
     piThreadCreate(stepperRunThread1);
     
-
     wiringPiISR(halls[0], INT_EDGE_FALLING, h0);
     wiringPiISR(halls[1], INT_EDGE_FALLING, h1);
     wiringPiISR(halls[2], INT_EDGE_FALLING, h2);
     wiringPiISR(halls[3], INT_EDGE_FALLING, h3);
-}
-
-bool resetting = false;
-
-void SteppersReset() {
-    resetting = true;
-    steppers[0].moveTo(99999);
-    while (digitalRead(halls[1]) != LOW)
-        steppers[0].run();
-    steppers[0].setCurrentPosition(0);
-    steppers[0].moveTo(0);
-    steppers[0].moveTo(-99999);
-    while (digitalRead(halls[0]) != LOW)
-        steppers[0].run();
-    length[0] = -steppers[0].currentPosition();
-    steppers[0].setCurrentPosition(0);
-    steppers[0].moveTo(0);
-
-    steppers[1].moveTo(99999);
-    while (digitalRead(halls[3]) != LOW)
-        steppers[1].run();
-    steppers[1].setCurrentPosition(0);
-    steppers[1].moveTo(0);
-    steppers[1].moveTo(-99999);
-    while (digitalRead(halls[2]) != LOW)
-        steppers[1].run();
-    length[1] = -steppers[1].currentPosition();
-    steppers[1].setCurrentPosition(0);
-    steppers[1].moveTo(0);
-
-    steppers[2].setCurrentPosition(0);
-    steppers[2].moveTo(99999);
-    bool was_high = false;
-    int prev_globe_pos = 0;
-    while (1) {
-        if (digitalRead(halls[4]) == LOW) {
-            if (was_high) {
-                cout << steppers[2].currentPosition() - prev_globe_pos << endl;
-                was_high = false;
-                if (steppers[2].currentPosition() - prev_globe_pos > 900) {
-                    break;
-                }
-                prev_globe_pos = steppers[2].currentPosition();
-            }
-        } else {
-            was_high = true;
-        }
-        steppers[2].run();
-    }
-    length[2] = steppers[2].currentPosition();
-    steppers[2].setCurrentPosition(0);
-    steppers[2].moveTo(globe_pos[0]);
-    while (steppers[2].isRunning()) {
-        steppers[2].run();
-    }
-    StopStepper(2);
-    resetting = false;
 }
 
 #endif

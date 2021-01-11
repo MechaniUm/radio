@@ -4,6 +4,9 @@
 #include <SFML/Audio.hpp>
 #include <iostream>
 #include <string>
+
+bool stop_threads = false;
+
 #include "Stepper.h"
 #include "Encoder.h"
 #include "Hall.h"
@@ -19,6 +22,7 @@ void SignalCallback(int signum) {
     DebugInfoStepper(1);
     DebugInfoStepper(2);
     HallsDebugInfo();
+    stop_threads = true;
     exit(0);
 }
 
@@ -93,59 +97,45 @@ int main() {
         "/home/pi/source/radio/wav/leaders/Roma.wav"
     };
     string noise_sound_path = "/home/pi/source/radio/wav/noise.wav";
-    sf::Music leaders_sounds[8];
-    sf::Music cities_sounds[8];
+
+    sf::SoundBuffer leaders_buffer[8];
+    sf::SoundBuffer cities_buffer[8];
+    sf::Sound leaders_sounds[8];
+    sf::Sound cities_sounds[8];
     for (int i = 0; i < 8; i++) {
-        leaders_sounds[i].openFromFile(leaders_sound_paths[i]);
+
+        leaders_buffer[i].loadFromFile(leaders_sound_paths[i]);
+        leaders_sounds[i].setBuffer(leaders_buffer[i]);
         leaders_sounds[i].setLoop(true);
 
-        cities_sounds[i].openFromFile(cities_sound_paths[i]);
+        cities_buffer[i].loadFromFile(cities_sound_paths[i]);
+        cities_sounds[i].setBuffer(cities_buffer[i]);
         cities_sounds[i].setLoop(true);
     }
-    sf::Music noise_sound;
-    noise_sound.openFromFile(noise_sound_path);
+    sf::SoundBuffer noise_buffer;
+    sf::Sound noise_sound;
+    noise_buffer.loadFromFile(noise_sound_path);
+    noise_sound.setBuffer(noise_buffer);
     noise_sound.setLoop(true);
     HardwareInit();
     noise_sound.play();
+    cities_sounds[0].setVolume(0.0);
+    leaders_sounds[0].setVolume(0.0);
     cities_sounds[0].play();
     leaders_sounds[0].play();
     int leader_id = 0, city_cur_pos = -1, leader_cur_pos = -1;
+    float last_noise_volume = 100.0, last_city_volume = 0.0, last_leader_volume = 0.0;
     float noise_volume = 100.0, city_volume = 0.0, leader_volume = 0.0;
     int last_city_id = 0, last_leader_id = 0;
     CalculateSoundPos();
     cout << "Init successfull\n";
-    int debounce_offset = 10;
-    last_action_time = chrono::steady_clock::now();
     while (true) {
         MoveStepper(0);
         MoveStepper(1);
+
         city_cur_pos = StepperCurrentPosition(0);
         leader_cur_pos = StepperCurrentPosition(1);
-        
-        if (city_cur_pos == 0 && digitalRead(halls[0]) == HIGH) {
-            ResetEncoder(0, debounce_offset);
-            StepperSetPosition(0, debounce_offset);
-        } else if (city_cur_pos == length[0] && digitalRead(halls[1]) == HIGH) {
-            ResetEncoder(0, length[0] - debounce_offset);
-            StepperSetPosition(0, length[0] - debounce_offset);
-        } else if (rotate_counter[0] == 16 && !resetted[0]) {
-            cout << steppers[0].currentPosition() << ' ';
-            resetted[0] = true;
-            ResetEncoder(0, 1490 - steppers[0].currentPosition() + steppers[0].targetPosition());
-            StepperSetPosition(0, 1490);
-            cout << "h5 middle reset 1490\n";
-        }
-        if (leader_cur_pos == 0 && digitalRead(halls[2]) == HIGH) {
-            ResetEncoder(1, debounce_offset);
-            StepperSetPosition(1, length[1] - debounce_offset);
-        } else if (leader_cur_pos == length[1] && digitalRead(halls[3]) == HIGH) {
-            ResetEncoder(1, length[1] - debounce_offset);
-            StepperSetPosition(1, length[1] - debounce_offset);
-        } else if (rotate_counter[1] == 16 && !resetted[1]) {
-            cout << steppers[1].currentPosition() << ' ';
-            resetted[1] = true;
-            cout << "h6 middle reset 1490\n";
-        }
+
         city_id = GetSoundId(0, city_cur_pos);
         leader_id = GetSoundId(1, leader_cur_pos);
 
@@ -153,9 +143,10 @@ int main() {
         leader_volume = GetVolume(1, leader_cur_pos, leader_id);
         if (city_volume >= 100 || leader_volume >= 100)
             noise_volume = 0;
-        else 
-            noise_volume = (100 - (city_volume + leader_volume)  / 2) / 4;
-        sched_yield();
+        else
+            noise_volume = (100.0 - (city_volume + leader_volume) / 2.0) / 4.0;
+        if (noise_volume < 0)
+            noise_volume = 0;
         if (last_city_id != city_id) {
             cities_sounds[last_city_id].stop();
             cities_sounds[city_id].play();
@@ -167,20 +158,18 @@ int main() {
             leaders_sounds[leader_id].play();
             last_leader_id = leader_id;
         }
-        cities_sounds[city_id].setVolume(city_volume);
-        sched_yield();
-        leaders_sounds[leader_id].setVolume(leader_volume);
-        sched_yield();
-        noise_sound.setVolume(noise_volume);
-        sched_yield();
-        chrono::steady_clock::time_point now = chrono::steady_clock::now();
-        auto time_dif = std::chrono::duration_cast<std::chrono::seconds>(now - last_action_time).count();
-        if (moved && (time_dif > 40 || (time_div > 20 && noise_volume == 0))) {
-            SteppersReset();
-            ResetEncoder(0, 0);
-            ResetEncoder(1, 0);
-            moved = false;
+        if (last_city_volume != city_volume) {
+            last_city_volume = city_volume;
+            cities_sounds[city_id].setVolume(city_volume);
         }
+        if (last_leader_volume != leader_volume) {
+            last_leader_volume = leader_volume;
+            leaders_sounds[leader_id].setVolume(leader_volume);
+        }
+        if (last_noise_volume != noise_volume) {
+            noise_sound.setVolume(noise_volume);
+        }
+        sched_yield();
     }
     return 0;
 }
