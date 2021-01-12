@@ -14,8 +14,7 @@ bool pause_threads = false;
 
 using namespace std;
 
-unsigned long afk_timeout = 5 * 60 * 1000; // 5 min
-
+unsigned long afk_timeout = 15 * 60 * 1000; // 15 min
 int sound_pos[16];
 
 void SignalCallback(int signum) {
@@ -132,8 +131,8 @@ int main() {
     cities_sounds[0].play();
     leaders_sounds[0].play();
     int leader_id = 0, city_cur_pos = -1, leader_cur_pos = -1;
-    float last_noise_volume = 100.0, last_city_volume = 0.0, last_leader_volume = 0.0;
-    float noise_volume = 100.0, city_volume = 0.0, leader_volume = 0.0;
+    float last_noise_volume = 24.9463, last_city_volume = 0.0, last_leader_volume = 0.0;
+    float noise_volume = 24.9463, city_volume = 0.0, leader_volume = 0.0;
     int last_city_id = 0, last_leader_id = 0;
     CalculateSoundPos();
     cout << "Init successfull\n";
@@ -149,8 +148,25 @@ int main() {
             cities_sounds[last_city_id].stop();
             noise_sound.stop();
             HardwareReset();
+
+            last_noise_volume = 24.9463;
+            noise_volume = 24.9463;
+
+            last_city_volume = 0.0;
+            city_volume = 0.0;
+
+            last_leader_volume = 0.0;
+            leader_volume = 0.0;
+
+            city_id = 0;
+            last_city_id = 0;
+
+            leader_id = 0;
+            last_leader_id = 0;
+
             cities_sounds[0].setVolume(0.0);
             leaders_sounds[0].setVolume(0.0);
+            noise_sound.setVolume(24.9463);
             cities_sounds[0].play();
             leaders_sounds[0].play();
             noise_sound.play();
@@ -195,7 +211,7 @@ int main() {
             last_leader_volume = leader_volume;
             leaders_sounds[leader_id].setVolume(leader_volume);
         }
-        if (last_noise_volume != noise_volume) {
+        if (fabs(last_noise_volume - noise_volume) > 1.0) {
             last_noise_volume = noise_volume;
             noise_sound.setVolume(noise_volume);
             action_time = millis();
