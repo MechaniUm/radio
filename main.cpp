@@ -4,9 +4,11 @@
 #include <SFML/Audio.hpp>
 #include <iostream>
 #include <string>
+#include <atomic>
 
-bool stop_threads = false;
-bool pause_threads = false;
+std::atomic_bool stop_threads(false);
+std::atomic_bool pause_threads(false);
+
 #include "Stepper.h"
 #include "Encoder.h"
 #include "Hall.h"
@@ -22,7 +24,8 @@ void SignalCallback(int signum) {
     DebugInfoStepper(1);
     DebugInfoStepper(2);
     HallsDebugInfo();
-    stop_threads = true;
+    // stop_threads = true;
+    stop_threads.store(true, std::memory_order_seq_cst);
     exit(0);
 }
 
@@ -142,7 +145,7 @@ int main() {
 
         if (!afk && labs(millis() - action_time) > afk_timeout) {
             afk = true;
-            pause_threads = true;
+            pause_threads.store(true, std::memory_order_seq_cst);
 
             leaders_sounds[last_leader_id].stop();
             cities_sounds[last_city_id].stop();
@@ -172,7 +175,7 @@ int main() {
             noise_sound.play();
 
             action_time = millis();
-            pause_threads = false;
+            pause_threads.store(false, std::memory_order_seq_cst);
         }
 
         MoveStepper(0);

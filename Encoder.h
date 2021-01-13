@@ -20,7 +20,7 @@ bool CanDec(int n);
 bool CanInc(int n);
 
 void UpdateEncoder(int n) {
-    if (pause_threads) return; 
+    if (pause_threads.load(std::memory_order_seq_cst)) return; 
     uint8_t tmp_state = state[n] & 3;
     if (digitalRead(pin_a[n])) {
         tmp_state |= 4;

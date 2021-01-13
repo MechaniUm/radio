@@ -59,8 +59,8 @@ void StopStepper(int n) {
 
 PI_THREAD (stepperRunThread0) {
     while (true) {
-        if (stop_threads) break;
-        if (!pause_threads)
+        if (stop_threads.load(std::memory_order_seq_cst)) break;
+        if (!pause_threads.load(std::memory_order_seq_cst))
             RunStepper(0);
         sched_yield();
     }
@@ -69,8 +69,8 @@ PI_THREAD (stepperRunThread0) {
 
 PI_THREAD (stepperRunThread1) {
     while (true) {
-        if (stop_threads) break;
-        if (!pause_threads)
+        if (stop_threads.load(std::memory_order_seq_cst)) break;
+        if (!pause_threads.load(std::memory_order_seq_cst))
            RunStepper(1);
         sched_yield();
     }
@@ -91,7 +91,7 @@ void SteppersDisable() {
 
 
 void h0() {
-    if (pause_threads) return;
+    if (pause_threads.load(std::memory_order_seq_cst)) return;
     piLock(0);
     ResetEncoder(0, 0);
     can_dec[0] = false;
@@ -103,7 +103,7 @@ void h0() {
 }
 
 void h1() {
-    if (pause_threads) return;
+    if (pause_threads.load(std::memory_order_seq_cst)) return;
     piLock(0);
     can_inc[0] = false;
     last_hall_change_time[1] = millis();
@@ -115,7 +115,7 @@ void h1() {
 }
 
 void h2() {
-    if (pause_threads) return;
+    if (pause_threads.load(std::memory_order_seq_cst)) return;
     piLock(1);
     can_dec[1] = false;
     last_hall_change_time[2] = millis();
@@ -127,7 +127,7 @@ void h2() {
 }
 
 void h3() {
-    if (pause_threads) return;
+    if (pause_threads.load(std::memory_order_seq_cst)) return;
     piLock(1);
     can_inc[1] = false;
     last_hall_change_time[3] = millis();

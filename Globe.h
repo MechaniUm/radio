@@ -45,9 +45,8 @@ PI_THREAD (stepperRunThread2) {
 
     while (true) {
 
-        if (stop_threads) break;
-        // cout << pause_threads << '\n';
-        if (!pause_threads) {
+        if (stop_threads.load(std::memory_order_seq_cst)) break;
+        if (!pause_threads.load(std::memory_order_seq_cst)) {
             if (labs(millis() - time) > 200) {
                 piLock(0);
                 int cur_pos = steppers[0].targetPosition();
