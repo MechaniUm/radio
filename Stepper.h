@@ -160,8 +160,7 @@ void StepperInit(int n) {
         length[n] = -steppers[n].currentPosition();
         steppers[n].setCurrentPosition(0);
         steppers[n].moveTo(0);
-        right_bound[0] = length[0];
-        right_bound[1] = length[1];
+        right_bound[n] = length[n];
         std::cout << "Stepper " << n << " length =  " << length[n] << std::endl;
     }
 }

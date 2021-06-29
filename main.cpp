@@ -16,7 +16,7 @@ std::atomic_bool pause_threads(false);
 
 using namespace std;
 
-unsigned long afk_timeout = 15 * 60 * 1000; // 15 min
+unsigned long afk_timeout = 3 * 60 * 1000; // 3 min
 int sound_pos[16];
 
 void SignalCallback(int signum) {
@@ -49,8 +49,14 @@ float GetVolume(int n, int pos, int sound_id) {
     float t3 = t1 * 7 / 10;
 
     float x = pos - t1 * sound_id;
+
     if (x > t1) x = t1;
     if (x <= 0) return 0;
+
+    if (x <= t1 * 0.2) return 0;
+    if (x >= t1 * 0.8) return 0;
+
+
     if (x < t2) {
         return 100 * (1 - (t2 - x) / t2);
     } else if (x > t3) {
@@ -73,13 +79,17 @@ void CalculateSoundPos() {
 }
 
 int GetSoundId(int n, int pos) {
-    for (int i = 0; i < 8; i++) {
+
+    for (int i = 0; i < 7; i++) {
         if (pos < sound_pos[8 * n + i]) {
             return i;
         }
     }
-    cout << "sound id -1 at " << pos << ' ' << n << endl;
-    return -1;
+    if (pos > sound_pos[15])
+        CalculateSoundPos();
+    return 7;
+    // cout << "sound id -1 at " << pos << ' ' << n << endl;
+    // return -1;
 }
 
 
@@ -169,7 +179,7 @@ int main() {
 
             cities_sounds[0].setVolume(0.0);
             leaders_sounds[0].setVolume(0.0);
-            noise_sound.setVolume(24.9463);
+            noise_sound.setVolume(0.0);
             cities_sounds[0].play();
             leaders_sounds[0].play();
             noise_sound.play();
@@ -182,7 +192,19 @@ int main() {
         MoveStepper(1);
 
         city_cur_pos = StepperCurrentPosition(0);
+        if (city_cur_pos >= length[0] - 5) {
+            city_cur_pos = length[0] - 10;
+        }
+        if (city_cur_pos < 0) {
+            city_cur_pos = 0;
+        }
         leader_cur_pos = StepperCurrentPosition(1);
+        if (leader_cur_pos >= length[1] - 5) {
+            leader_cur_pos = length[1] - 10;
+        }
+        if (leader_cur_pos < 0) {
+            leader_cur_pos = 0;
+        }
 
         city_id = GetSoundId(0, city_cur_pos);
         leader_id = GetSoundId(1, leader_cur_pos);
@@ -206,13 +228,11 @@ int main() {
             leaders_sounds[leader_id].play();
             last_leader_id = leader_id;
         }
-        if (last_city_volume != city_volume) {
+        if (last_city_volume != city_volume || last_leader_volume != leader_volume) {
             last_city_volume = city_volume;
-            cities_sounds[city_id].setVolume(city_volume);
-        }
-        if (last_leader_volume != leader_volume) {
+            cities_sounds[city_id].setVolume(city_volume * (1.0 - leader_volume * 0.1 / 100.0));
             last_leader_volume = leader_volume;
-            leaders_sounds[leader_id].setVolume(leader_volume);
+            leaders_sounds[leader_id].setVolume(leader_volume * 0.8);
         }
         if (fabs(last_noise_volume - noise_volume) > 1.0) {
             last_noise_volume = noise_volume;
